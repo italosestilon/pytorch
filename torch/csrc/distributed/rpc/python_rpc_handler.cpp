@@ -26,6 +26,21 @@ PythonRpcHandler::PythonRpcHandler() {
   pySerialize_ = getFunction(module, "serialize");
 }
 
+// In default, PythonRpcHandler will call dec_ref() to clean up python objects.
+// It is found that PythonRpcHandler will dec_ref() null python objects and
+// crashed when program exits in Python 3.5 only (The theory is: the python
+// objects are cleaned up before destructing PythonRpcHandler when program
+// exits in Python 3.5).
+// To avoid PythonRpcHandler destructor to call dec_ref(), explicitly assign
+// the py::handle to be none. This will not have memory leak, as when destruting
+// PythonRpcHandler singleton when program exits, all memories will be cleaned
+// up by OS.
+PythonRpcHandler::~PythonRpcHandler() {
+  pyRunFunction_ = py::none();
+  pyLoadReturnValue_ = py::none();
+  pySerialize_ = py::none();
+}
+
 PythonRpcHandler& PythonRpcHandler::getInstance() {
   static PythonRpcHandler handler;
   return handler;
@@ -37,6 +52,7 @@ std::vector<char> PythonRpcHandler::generatePythonUDFResult(
     std::vector<torch::Tensor>& responseTensorTable) {
   AutoGIL ag;
   auto pargs = py::bytes(pickledPayload.data(), pickledPayload.size());
+  TORCH_CHECK(!pyRunFunction_.is_none(), "pyRunFunction_ is none");
   py::tuple pres = pySerialize_(pyRunFunction_(pargs, requestTensorTable));
   const auto& presStr = pres[0].cast<std::string>();
   responseTensorTable = pres[1].cast<std::vector<torch::Tensor>>();
@@ -49,6 +65,7 @@ py::object PythonRpcHandler::loadPythonUDFResult(
     const std::vector<torch::Tensor>& tensorTable) {
   AutoGIL ag;
   auto pargs = py::bytes(pickledPayload.data(), pickledPayload.size());
+  TORCH_CHECK(!pyLoadReturnValue_.is_none(), "pyLoadReturnValue_ is none");
   return pyLoadReturnValue_(pargs, tensorTable);
 }
 

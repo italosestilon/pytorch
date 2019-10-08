@@ -41,7 +41,7 @@ class PYBIND11_EXPORT PythonRpcHandler {
 
  private:
   PythonRpcHandler();
-  ~PythonRpcHandler() = default;
+  ~PythonRpcHandler();
 
   PythonRpcHandler(const PythonRpcHandler&) = delete;
   PythonRpcHandler& operator=(const PythonRpcHandler&) = delete;
